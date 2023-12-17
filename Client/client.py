@@ -328,7 +328,7 @@ class App:
                         dpg.add_text(i)
 
             dpg.add_spacer(height=20)
-            dpg.add_text(f"Copyright (C) 2023 ThaiSDR All rights reserved. (MIT)")
+            dpg.add_text(f"Copyright (C) 2023 ThaiSDR All rights reserved. (GPLv3)")
 
     def menubar(self):
         with dpg.viewport_menu_bar():
