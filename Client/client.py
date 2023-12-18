@@ -8,12 +8,29 @@ import numpy as np
 import pickle
 import pyaudio
 from pyogg import OpusDecoder
-from damp11113 import CV22DPG
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import scrypt
-from Crypto.Random import get_random_bytes
+import configparser
+import ctypes
 
 librarylist = ["Opencv (opencv.org)", "PyOgg (TeamPyOgg)", "DearPyGui (hoffstadt)"]
+
+def CV22DPG(cv2_array):
+    try:
+        if cv2_array is None or len(cv2_array.shape) < 3:
+            print("Invalid or empty array received.")
+            return None
+
+        if len(cv2_array.shape) == 2:
+            cv2_array = cv2_array[:, :, np.newaxis]
+
+        data = np.flip(cv2_array, 2)
+        data = data.ravel()
+        data = np.asfarray(data, dtype='f')
+        return np.true_divide(data, 255.0)
+    except Exception as e:
+        print("Error in CV22DPG:", e)
+        return None
 
 def calculate_speed(start_time, end_time, data_size):
     elapsed_time = end_time - start_time
@@ -62,7 +79,9 @@ def decrypt_data(encrypted_message, password, salt, iv):
 class App:
     def __init__(self):
         self.RDS = None
-        self.device_name_output = "Speakers (2- USB Audio DAC   )"
+        self.config = configparser.ConfigParser()
+        self.config.read("config.ini")
+        self.device_name_output = self.config["audio"]["device"]
         self.working = False
         self.readchannel = 1
         self.firstrun = True
@@ -72,6 +91,7 @@ class App:
         self.ccisencrypt = None
         self.ccisdecrypt = None
         self.ccisdecryptpassword = None
+        self.paudio = pyaudio.PyAudio()
 
     def connecttoserver(self, sender, data):
         dpg.configure_item("connectservergroup", show=False)
@@ -85,11 +105,10 @@ class App:
         except:
             dpg.configure_item("connectbutton", show=True)
         self.working = True
-        p = pyaudio.PyAudio()
 
         self.device_index_output = 0
-        for i in range(p.get_device_count()):
-            dev = p.get_device_info_by_index(i)
+        for i in range(self.paudio.get_device_count()):
+            dev = self.paudio.get_device_info_by_index(i)
             if dev['name'] == self.device_name_output:
                 self.device_index_output = dev['index']
                 break
@@ -145,11 +164,9 @@ class App:
         self.ccisdecrypt = None
         self.ccisdecryptpassword = None
 
-        p = pyaudio.PyAudio()
-
         self.device_index_output = 0
-        for i in range(p.get_device_count()):
-            dev = p.get_device_info_by_index(i)
+        for i in range(self.paudio.get_device_count()):
+            dev = self.paudio.get_device_info_by_index(i)
             if dev['name'] == self.device_name_output:
                 self.device_index_output = dev['index']
                 break
@@ -158,6 +175,11 @@ class App:
         dpg.configure_item("requestpasswordpopup", show=False)
         self.ccdecryptpassword = dpg.get_value("requestpasswordinputpopup")
         self.ccisdecryptpassword = True
+
+    def changeaudiodevice(self, sender, data):
+        self.device_name_output = dpg.get_value(sender)
+        self.config["audio"]["device"] = dpg.get_value(sender)
+        self.config.write(open('config.ini', 'w'))
 
     def stream(self, socket):
         opus_decoder = None
@@ -223,11 +245,10 @@ class App:
                         pass
 
                     if self.firstrun:
-                        p = pyaudio.PyAudio()
                         opus_decoder = OpusDecoder()
                         opus_decoder.set_channels(self.RDS["ContentInfo"]["channel"])
                         opus_decoder.set_sampling_frequency(self.RDS["ContentInfo"]["samplerates"])
-                        streamoutput = p.open(format=pyaudio.paInt16, channels=self.RDS["ContentInfo"]["channel"], rate=self.RDS["ContentInfo"]["samplerates"], output=True, output_device_index=self.device_index_output)
+                        streamoutput = self.paudio.open(format=pyaudio.paInt16, channels=self.RDS["ContentInfo"]["channel"], rate=self.RDS["ContentInfo"]["samplerates"], output=True, output_device_index=self.device_index_output)
                         evaluation_audio_X = np.fft.fftfreq(1024, 1.0 / self.RDS["ContentInfo"]["samplerates"])[:1024 // 2]
                         if len(datadecoded["channel"]) > 1:
                             channel_info = []
@@ -441,6 +462,12 @@ class App:
                         dpg.add_line_series([], [], label="Audio Data", parent="y_axis2", tag="transferateaudiodataoncchannelplot")
                         dpg.add_line_series([], [], label="Images Data", parent="y_axis3", tag="transferateimagesoncchannelplot")
 
+        with dpg.window(label="Config", tag="configwindow", show=False, width=500):
+            dpg.add_text("Please restart software when configured")
+            with dpg.tab_bar():
+                with dpg.tab(label="Audio"):
+                    dpg.add_combo([], label="Output Device", tag="selectaudiooutputdevicecombo", callback=self.changeaudiodevice)
+
     def menubar(self):
         with dpg.viewport_menu_bar():
             with dpg.menu(label="File"):
@@ -448,11 +475,17 @@ class App:
             with dpg.menu(label="View"):
                 dpg.add_menu_item(label="Evaluation", callback=lambda: dpg.configure_item("evaluationwindow", show=True))
             with dpg.menu(label="Settings"):
+                dpg.add_menu_item(label="Config", callback=lambda: dpg.configure_item("configwindow", show=True))
+                dpg.add_spacer()
                 dpg.add_menu_item(label="StyleEditor", callback=dpg.show_style_editor)
+
             with dpg.menu(label="Help"):
                 dpg.add_menu_item(label="About", callback=lambda: dpg.configure_item("aboutwindow", show=True))
 
     def init(self):
+        if self.config["debug"]["hideconsole"] == "true":
+            ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
+
         dpg.create_context()
         dpg.create_viewport(title=f'IDRB Client v1.5 Beta', width=1280, height=720, large_icon="IDRBfavicon.ico")  # set viewport window
         dpg.setup_dearpygui()
@@ -472,6 +505,16 @@ class App:
 
         self.window()
         self.menubar()
+
+        num_devices = self.paudio.get_device_count()
+        output_devices = []
+        for i in range(num_devices):
+            device_info = self.paudio.get_device_info_by_index(i)
+            if device_info['maxOutputChannels'] > 0:
+                output_devices.append(device_info['name'])
+
+        dpg.configure_item("selectaudiooutputdevicecombo", items=output_devices, default_value=self.config["audio"]["device"])
+
         # -------------------------------------------
         dpg.show_viewport()
         # Start a separate thread for a task
