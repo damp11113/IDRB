@@ -21,7 +21,7 @@ def pad_message(message_bytes):
 
 def encrypt_data(message_bytes, password):
     # Derive a key from the password
-    salt = get_random_bytes(16)
+    salt = get_random_bytes(50)
     key = scrypt(password, salt, key_len=32, N=2 ** 14, r=8, p=1)
 
     # Generate an IV (Initialization Vector)
@@ -266,17 +266,19 @@ audio_thread2.start()
 connectionlist = []
 connected_users = 0
 
+first = True
+
 def handle_client():
-    global connected_users
+    global connected_users, first
     try:
         while True:
             # Get the encoded audio from the buffer
             ENchannel1 = channel1.get()
 
             # encrypt data
-            ENC1encrypted, ENC1salt, ENC1iv = encrypt_data(ENchannel1, "password")
+            #ENC1encrypted, ENC1salt, ENC1iv = encrypt_data(ENchannel1, "password")
 
-            ENchannel1 = ENC1encrypted + b'|||||' + ENC1salt + b'|||||' + ENC1iv
+            #ENchannel1 = ENC1encrypted + b'|||||' + ENC1salt + b'|||||' + ENC1iv
 
             ENchannel2 = channel2.get()
             content = {
@@ -314,10 +316,12 @@ def handle_client():
                         i.close()
                         connectionlist.remove(i)
                         connected_users -= 1
+            # check if no user
+            if not connectionlist:
+                first = True
+                break
     except Exception as e:
         print(f'Error: {e}')
-
-first = True
 
 # Your main server logic using threading for handling connections
 while True:

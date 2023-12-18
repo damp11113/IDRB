@@ -165,21 +165,22 @@ class App:
         tfrpx = list(range(250))
         altfrpy = [0] * 250
         adcctfrpy = [0] * 250
-        imcctfrpy = [0] * 250
+        imcctfrpy = [0] * 2500
         bytesconunt = 0
         bytesconunt_frame = 0
         start_time = time.time()
+        evaluation_audio_X = None
         while True:
             try:
                 if self.working:
-                    #data = b''
-                    data = socket.recv(1580152)
-                    #while True:
-                    #    part = socket.recv(1024)
-                    #    data += part
-                    #    if len(part) < 1024:
-                    #        # either 0 or end of data
-                    #        break
+                    data = b''
+                    #data = socket.recv(1580152)
+                    while True:
+                        part = socket.recv(1024)
+                        data += part
+                        if len(part) < 1024:
+                            # either 0 or end of data
+                            break
 
                     bytesconunt += len(data)
 
@@ -227,6 +228,7 @@ class App:
                         opus_decoder.set_channels(self.RDS["ContentInfo"]["channel"])
                         opus_decoder.set_sampling_frequency(self.RDS["ContentInfo"]["samplerates"])
                         streamoutput = p.open(format=pyaudio.paInt16, channels=self.RDS["ContentInfo"]["channel"], rate=self.RDS["ContentInfo"]["samplerates"], output=True, output_device_index=self.device_index_output)
+                        evaluation_audio_X = np.fft.fftfreq(1024, 1.0 / self.RDS["ContentInfo"]["samplerates"])[:1024 // 2]
                         if len(datadecoded["channel"]) > 1:
                             channel_info = []
                             for i in range(1, len(datadecoded["channel"]) + 1):
@@ -241,9 +243,11 @@ class App:
                             dpg.configure_item("station_logo_config", show=False)
                         dpg.configure_item("disconnectbutton", show=True)
                         dpg.configure_item("RDSPI", default_value=f"PI: {hex(self.RDS['PI'])[2:].upper()}")
-                        if self.firststart:
+                        if self.firststart and len(datadecoded["channel"]) > 1:
                             self.readchannel = datadecoded["mainchannel"]
-                            dpg.configure_item("mediachannelselect", show=True, default_value="mainchannel")
+                            dpg.configure_item("mediachannelselect", show=True, default_value=channel_info[self.readchannel - 1])
+                        elif self.firststart:
+                            self.readchannel = datadecoded["mainchannel"]
 
                         # check if channel is encrypted
                         if datadecoded["channel"][self.readchannel]["Encrypt"]:
@@ -284,6 +288,19 @@ class App:
                                 pcm_to_write = np.frombuffer(decoded_pcm, dtype=np.int16)
 
                                 streamoutput.write(pcm_to_write.tobytes())
+
+                                audioL = pcm_to_write[::2]
+                                audioR = pcm_to_write[1::2]
+
+                                Lnormalized_data = audioL * np.hanning(len(audioL))
+                                Lfft_data = np.abs(np.fft.fft(Lnormalized_data))[:1024 // 2]
+
+                                Rnormalized_data = audioR * np.hanning(len(audioR))
+                                Rfft_data = np.abs(np.fft.fft(Rnormalized_data))[:1024 // 2]
+
+                                dpg.set_value('audioinfoleftplot', [evaluation_audio_X, Lfft_data])
+                                dpg.set_value('audioinforightplot', [evaluation_audio_X, Rfft_data])
+
                             else:
                                 print("Decoded PCM is empty")
 
@@ -350,31 +367,15 @@ class App:
 
         with dpg.window(label="IDRB Server Info", tag="Serverinfowindow", show=False):
             dpg.add_text("Listener: ...", tag="ServerListener")
-            dpg.add_spacer()
+            #dpg.add_spacer()
             #dpg.add_simple_plot(label="Transfer Rates", autosize=True, height=250, width=500, tag="transferateplot")
-
-
-            with dpg.plot(label="Transfer Rates", height=250, width=500):
-                # optionally create legend
-                dpg.add_plot_legend()
-
-                # REQUIRED: create x and y axes
-                dpg.add_plot_axis(dpg.mvXAxis, label="x", tag="x_axis", no_gridlines=True)
-                dpg.add_plot_axis(dpg.mvYAxis, label="y", tag="y_axis1", no_gridlines=True)
-                dpg.add_plot_axis(dpg.mvYAxis, label="y", tag="y_axis2", no_gridlines=True)
-                dpg.add_plot_axis(dpg.mvYAxis, label="y", tag="y_axis3", no_gridlines=True)
-
-                # series belong to a y axis
-                dpg.add_line_series([], [], label="All Data", parent="y_axis1", tag="transferatealldataplot")
-                dpg.add_line_series([], [], label="Audio Data", parent="y_axis2", tag="transferateaudiodataoncchannelplot")
-                dpg.add_line_series([], [], label="Images Data", parent="y_axis3", tag="transferateimagesoncchannelplot")
 
         with dpg.window(label="IDRB About", tag="aboutwindow", show=False, no_resize=True):
             dpg.add_image("app_logo")
             dpg.add_spacer()
             dpg.add_text("IDRB (Internet Digital Radio Broadcasting System) Client")
             dpg.add_spacer()
-            dpg.add_text(f"IDRB Client v1.2 Beta")
+            dpg.add_text(f"IDRB Client v1.5 Beta")
             dpg.add_spacer()
 
             desc = "IDRB is a novel internet radio broadcasting alternative that uses HLS/DASH/HTTP streams, transferring over TCP/IP. This system supports images and RDS (Dynamic update) capabilities, enabling the transmission of station information. Additionally, it allows for setting station logos and images. IDRB offers multi-broadcasting functionalities and currently supports the Opus codec, with plans to incorporate PCM, MP2/3, AAC/AAC+, and more in the future, ensuring low delay. If you find this project intriguing, you can support it at damp11113.xyz/support."
@@ -405,10 +406,47 @@ class App:
             dpg.add_spacer()
             dpg.add_button(label="confirm", callback=self.submitpassworddecrypt)
 
+        with dpg.window(label="IDRB Evaluation", tag="evaluationwindow", show=False):
+            with dpg.tab_bar():
+                with dpg.tab(label="Audio"):
+                    with dpg.plot(label="FFT Spectrum", height=250, width=500):
+                        # optionally create legend
+                        dpg.add_plot_legend()
+
+                        # REQUIRED: create x and y axes
+                        dpg.add_plot_axis(dpg.mvXAxis, tag="x_axis_1", no_gridlines=True, label="Frequencies")
+                        dpg.add_plot_axis(dpg.mvYAxis, tag="audioL_y_axis", no_gridlines=True)
+                        dpg.add_plot_axis(dpg.mvYAxis, tag="audioR_y_axis", no_gridlines=True)
+
+                        dpg.set_axis_limits("audioL_y_axis", 0, 2500000)
+                        dpg.set_axis_limits("audioR_y_axis", 0, 2500000)
+
+                        # series belong to a y axis
+                        dpg.add_line_series([], [], label="Left Channel", parent="audioL_y_axis", tag="audioinfoleftplot")
+                        dpg.add_line_series([], [], label="Right Channel", parent="audioR_y_axis", tag="audioinforightplot")
+
+                with dpg.tab(label="Network"):
+                    with dpg.plot(label="Transfer Rates", height=250, width=500):
+                        # optionally create legend
+                        dpg.add_plot_legend()
+
+                        # REQUIRED: create x and y axes
+                        dpg.add_plot_axis(dpg.mvXAxis, tag="x_axis", no_gridlines=True)
+                        dpg.add_plot_axis(dpg.mvYAxis, tag="y_axis1", no_gridlines=True)
+                        dpg.add_plot_axis(dpg.mvYAxis, tag="y_axis2", no_gridlines=True)
+                        dpg.add_plot_axis(dpg.mvYAxis, tag="y_axis3", no_gridlines=True)
+
+                        # series belong to a y axis
+                        dpg.add_line_series([], [], label="All Data", parent="y_axis1", tag="transferatealldataplot")
+                        dpg.add_line_series([], [], label="Audio Data", parent="y_axis2", tag="transferateaudiodataoncchannelplot")
+                        dpg.add_line_series([], [], label="Images Data", parent="y_axis3", tag="transferateimagesoncchannelplot")
+
     def menubar(self):
         with dpg.viewport_menu_bar():
             with dpg.menu(label="File"):
                 dpg.add_menu_item(label="Exit", callback=lambda: self.exit())
+            with dpg.menu(label="View"):
+                dpg.add_menu_item(label="Evaluation", callback=lambda: dpg.configure_item("evaluationwindow", show=True))
             with dpg.menu(label="Settings"):
                 dpg.add_menu_item(label="StyleEditor", callback=dpg.show_style_editor)
             with dpg.menu(label="Help"):
@@ -416,7 +454,7 @@ class App:
 
     def init(self):
         dpg.create_context()
-        dpg.create_viewport(title=f'IDRB Client V1.2 Beta', width=1280, height=720, large_icon="IDRBfavicon.ico")  # set viewport window
+        dpg.create_viewport(title=f'IDRB Client v1.5 Beta', width=1280, height=720, large_icon="IDRBfavicon.ico")  # set viewport window
         dpg.setup_dearpygui()
         # -------------- add code here --------------
         noimage_texture_data = []
@@ -454,6 +492,8 @@ class App:
         dpg.fit_axis_data("y_axis1")
         dpg.fit_axis_data("y_axis2")
         dpg.fit_axis_data("y_axis3")
+
+        dpg.fit_axis_data("x_axis_1")
 
     def exit(self):
         dpg.destroy_context()
