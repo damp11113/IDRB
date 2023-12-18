@@ -9,10 +9,10 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-		"config.ini",
-		"IDRBfavicon.ico",
-		"IDRBfavicon.png",
-		"IDRBlogo.png",
+		('config.ini', '.'),  # Example source ('config.ini') and destination ('.') paths
+		('IDRBfavicon.ico', '.'),
+		('IDRBfavicon.png', '.'),
+		('IDRBlogo.png', '.')
 	],
     hiddenimports=[],
     hookspath=[],
