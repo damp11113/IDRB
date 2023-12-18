@@ -9,6 +9,36 @@ from damp11113 import scrollTextBySteps
 from queue import Queue
 from datetime import datetime, timezone
 import cv2
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import scrypt
+from Crypto.Random import get_random_bytes
+
+def pad_message(message_bytes):
+    block_size = AES.block_size
+    padding_length = block_size - (len(message_bytes) % block_size)
+    padding = bytes([padding_length] * padding_length)
+    return message_bytes + padding
+
+def encrypt_data(message_bytes, password):
+    # Derive a key from the password
+    salt = get_random_bytes(16)
+    key = scrypt(password, salt, key_len=32, N=2 ** 14, r=8, p=1)
+
+    # Generate an IV (Initialization Vector)
+    iv = get_random_bytes(AES.block_size)
+
+    # Pad the message
+    padded_message = pad_message(message_bytes)
+
+    # Initialize AES cipher in CBC mode
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+
+    # Encrypt the padded message
+    encrypted_message = cipher.encrypt(padded_message)
+
+    # Return the encrypted message, salt, and IV (for decryption)
+    return encrypted_message, salt, iv
+
 
 # create tcp
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -206,7 +236,9 @@ def encode_audio():
         encoded_packets = encoder.buffered_encode(memoryview(bytearray(pcm)))
         for encoded_packet, _, _ in encoded_packets:
             # Put the encoded audio into the buffer
+
             channel1.put(encoded_packet.tobytes())
+
 
 
 def encode_audio2():
@@ -240,18 +272,26 @@ def handle_client():
         while True:
             # Get the encoded audio from the buffer
             ENchannel1 = channel1.get()
+
+            # encrypt data
+            ENC1encrypted, ENC1salt, ENC1iv = encrypt_data(ENchannel1, "password")
+
+            ENchannel1 = ENC1encrypted + b'|||||' + ENC1salt + b'|||||' + ENC1iv
+
             ENchannel2 = channel2.get()
             content = {
                 "mainchannel": 1,
                 "channel": {
                     1: {
                         "Station": "DPRadio+",
+                        "Encrypt": b'|||||' in ENchannel1, # check if encrypt
                         "ContentSize": len(ENchannel1),
                         "Content": ENchannel1,
                         "RDS": RDS
                     },
                     2: {
                         "Station": "DPTest",
+                        "Encrypt": b'|||||' in ENchannel2,
                         "ContentSize": len(ENchannel2),
                         "Content": ENchannel2,
                         "RDS": RDS2

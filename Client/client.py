@@ -9,6 +9,9 @@ import pickle
 import pyaudio
 from pyogg import OpusDecoder
 from damp11113 import CV22DPG
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import scrypt
+from Crypto.Random import get_random_bytes
 
 librarylist = ["Opencv (opencv.org)", "PyOgg (TeamPyOgg)", "DearPyGui (hoffstadt)"]
 
@@ -37,6 +40,25 @@ def limit_string_in_line(text, limit):
 
     return '\n'.join(new_lines)
 
+def unpad_message(padded_message):
+    padding_length = padded_message[-1]
+    return padded_message[:-padding_length]
+
+def decrypt_data(encrypted_message, password, salt, iv):
+    # Derive the key from the password and salt
+    key = scrypt(password, salt, key_len=32, N=2 ** 14, r=8, p=1)
+
+    # Initialize AES cipher in CBC mode
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+
+    # Decrypt the message
+    decrypted_message = cipher.decrypt(encrypted_message)
+
+    # Unpad the decrypted message
+    unpadded_message = unpad_message(decrypted_message)
+
+    return unpadded_message
+
 class App:
     def __init__(self):
         self.RDS = None
@@ -46,6 +68,10 @@ class App:
         self.firstrun = True
         self.firststart = True
         self.device_index_output = 0
+        self.ccdecryptpassword = None
+        self.ccisencrypt = None
+        self.ccisdecrypt = None
+        self.ccisdecryptpassword = None
 
     def connecttoserver(self, sender, data):
         dpg.configure_item("connectservergroup", show=False)
@@ -85,6 +111,10 @@ class App:
         dpg.configure_item("serverstatus", default_value='disconnected', color=(255, 0, 0))
         self.firstrun = True
         self.firststart = True
+        self.ccdecryptpassword = None
+        self.ccisencrypt = None
+        self.ccisdecrypt = None
+        self.ccisdecryptpassword = None
 
     def RDSshow(self):
         try:
@@ -110,6 +140,10 @@ class App:
         dpg.configure_item("station_logo_config", show=False)
         self.readchannel = int(dpg.get_value(sender).split(" ")[0])
         self.firstrun = True
+        self.ccdecryptpassword = None
+        self.ccisencrypt = None
+        self.ccisdecrypt = None
+        self.ccisdecryptpassword = None
 
         p = pyaudio.PyAudio()
 
@@ -119,6 +153,11 @@ class App:
             if dev['name'] == self.device_name_output:
                 self.device_index_output = dev['index']
                 break
+
+    def submitpassworddecrypt(self, sender, data):
+        dpg.configure_item("requestpasswordpopup", show=False)
+        self.ccdecryptpassword = dpg.get_value("requestpasswordinputpopup")
+        self.ccisdecryptpassword = True
 
     def stream(self, socket):
         opus_decoder = None
@@ -191,7 +230,7 @@ class App:
                         if len(datadecoded["channel"]) > 1:
                             channel_info = []
                             for i in range(1, len(datadecoded["channel"]) + 1):
-                                channel_info.append(f'{i} {datadecoded["channel"][i]["Station"]} ({datadecoded["channel"][i]["RDS"]["ContentInfo"]["Codec"]} {datadecoded["channel"][i]["RDS"]["ContentInfo"]["bitrate"] / 1000}Kbps {datadecoded["channel"][i]["RDS"]["AudioMode"]})')
+                                channel_info.append(f'{i} {"[Encrypt]" if datadecoded["channel"][i]["Encrypt"] else "[No Encrypt]"} {datadecoded["channel"][i]["Station"]} ({datadecoded["channel"][i]["RDS"]["ContentInfo"]["Codec"]} {datadecoded["channel"][i]["RDS"]["ContentInfo"]["bitrate"] / 1000}Kbps {datadecoded["channel"][i]["RDS"]["AudioMode"]})')
                             dpg.configure_item("mediachannelselect", show=True, items=channel_info)
                         dpg.configure_item("morerdsbutton", show=True)
                         dpg.configure_item("serverinfobutton", show=True)
@@ -205,25 +244,53 @@ class App:
                         if self.firststart:
                             self.readchannel = datadecoded["mainchannel"]
                             dpg.configure_item("mediachannelselect", show=True, default_value="mainchannel")
-                        dpg.configure_item("serverstatus", default_value='connected --Kbps (----)', color=(0, 255, 0))
+
+                        # check if channel is encrypted
+                        if datadecoded["channel"][self.readchannel]["Encrypt"]:
+                            dpg.configure_item("requestpasswordpopup", show=True)
+                            dpg.configure_item("serverstatus", default_value='connected', color=(0, 255, 0))
+                            self.ccisencrypt = True
+                        else:
+                            dpg.configure_item("serverstatus", default_value='connected --Kbps (----)', color=(0, 255, 0))
+
                         self.firstrun = False
                         self.firststart = False
 
-
                     if not self.firstrun:
-                        decoded_pcm = opus_decoder.decode(memoryview(bytearray(datadecoded["channel"][self.readchannel]["Content"])))
+                        data = datadecoded["channel"][self.readchannel]["Content"]
+
+                        if self.ccisdecryptpassword and self.ccisencrypt:
+                            try:
+                                # decrypt data
+                                encryptdata = data.split(b'|||||')[0]
+                                salt = data.split(b'|||||')[1]
+                                iv = data.split(b'|||||')[2]
+
+                                data = decrypt_data(encryptdata, self.ccdecryptpassword, salt, iv)
+
+                                if data == b'':
+                                    self.ccisdecrypt = False
+                                    self.ccdecryptpassword = None
+                                else:
+                                    self.ccisdecrypt = True
+                            except:
+                                dpg.configure_item("serverstatus", default_value="Decrypt Error", color=(255, 0, 0))
+
+                        if self.ccisdecrypt or not self.ccisencrypt:
+                            decoded_pcm = opus_decoder.decode(memoryview(bytearray(data)))
+
+                            # Check if the decoded PCM is empty or not
+                            if len(decoded_pcm) > 0:
+                                pcm_to_write = np.frombuffer(decoded_pcm, dtype=np.int16)
+
+                                streamoutput.write(pcm_to_write.tobytes())
+                            else:
+                                print("Decoded PCM is empty")
+
                         if len(adcctfrpy) > 250:
                             adcctfrpy.pop(0)
                         adcctfrpy.append(len(datadecoded["channel"][self.readchannel]["Content"]))
                         dpg.set_value('transferateaudiodataoncchannelplot', [tfrpx, adcctfrpy])
-
-                    # Check if the decoded PCM is empty or not
-                    if len(decoded_pcm) > 0:
-                        pcm_to_write = np.frombuffer(decoded_pcm, dtype=np.int16)
-
-                        streamoutput.write(pcm_to_write.tobytes())
-                    else:
-                        print("Decoded PCM is empty")
 
                     bytesconunt_frame += 1
                 else:
@@ -241,6 +308,7 @@ class App:
                         pass
                     socket.close()
                     self.disconnectserver()
+                    raise
                     break
 
     def window(self):
@@ -329,6 +397,13 @@ class App:
 
             dpg.add_spacer(height=20)
             dpg.add_text(f"Copyright (C) 2023 ThaiSDR All rights reserved. (GPLv3)")
+
+        with dpg.window(label="Password Required", tag="requestpasswordpopup", modal=True, no_resize=True, no_close=True, no_move=True, show=False):
+            dpg.add_text("This channel is encrypt! Please enter password for decrypt.")
+            dpg.add_spacer()
+            dpg.add_input_text(label="password", tag="requestpasswordinputpopup")
+            dpg.add_spacer()
+            dpg.add_button(label="confirm", callback=self.submitpassworddecrypt)
 
     def menubar(self):
         with dpg.viewport_menu_bar():
