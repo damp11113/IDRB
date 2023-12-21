@@ -48,22 +48,11 @@ s.bind(server_port)
 
 s.listen(1)
 
-
 p = pyaudio.PyAudio()
 
 sample_rate = 48000
 bytes_per_sample = p.get_sample_size(pyaudio.paInt16)
 
-codec = "opus" # opus, pcm, aac
-
-# Create an Opus encoder
-bitrates = 64000 #Kbps
-channel = 2 # Stereo
-framesize = 60
-
-
-if bitrates >= 500000:
-    bitrates = 500000
 
 device_name_input = "Line 5 (Virtual Audio Cable)"
 device_index_input = 0
@@ -126,9 +115,9 @@ RDS = {
         # can add more here
     ],
     "ContentInfo": {
-        "Codec": codec,
-        "bitrate": bitrates,
-        "channel": channel,
+        "Codec": "opus",
+        "bitrate": 64000,
+        "channel": 2,
         "samplerates": sample_rate
     },
     "images": {
@@ -168,9 +157,9 @@ RDS2 = {
         # can add more server here
     ],
     "ContentInfo": {
-        "Codec": codec,
+        "Codec": "Opus",
         "bitrate": 8000,
-        "channel": channel,
+        "channel": 2,
         "samplerates": sample_rate
     },
     "images": {
@@ -226,9 +215,9 @@ def encode_audio():
     encoder = OpusBufferedEncoder()
     encoder.set_application("audio")
     encoder.set_sampling_frequency(sample_rate)
-    encoder.set_channels(channel)
-    encoder.set_bitrates(bitrates)
-    encoder.set_frame_size(framesize)
+    encoder.set_channels(2)
+    encoder.set_bitrates(64000)
+    encoder.set_frame_size(60)
 
     while True:
         pcm = np.frombuffer(streaminput.read(1024, exception_on_overflow=False), dtype=np.int16)
@@ -239,15 +228,13 @@ def encode_audio():
 
             channel1.put(encoded_packet.tobytes())
 
-
-
 def encode_audio2():
     encoder2 = OpusBufferedEncoder()
     encoder2.set_application("audio")
     encoder2.set_sampling_frequency(sample_rate)
-    encoder2.set_channels(channel)
+    encoder2.set_channels(2)
     encoder2.set_bitrates(8000)
-    encoder2.set_frame_size(framesize)
+    encoder2.set_frame_size(60)
 
     while True:
         pcm2 = np.frombuffer(streaminput2.read(1024, exception_on_overflow=False), dtype=np.int16)
@@ -256,6 +243,8 @@ def encode_audio2():
         for encoded_packet, _, _ in encoded_packets:
             # Put the encoded audio into the buffer
             channel2.put(encoded_packet.tobytes())
+
+        #channel2.put(pcm2.tobytes()) # if you use pcm
 
 audio_thread = threading.Thread(target=encode_audio)
 audio_thread.start()

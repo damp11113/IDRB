@@ -192,6 +192,7 @@ class App:
         bytesconunt_frame = 0
         start_time = time.time()
         evaluation_audio_X = None
+        decodecodec = None
         while True:
             try:
                 if self.working:
@@ -245,9 +246,11 @@ class App:
                         pass
 
                     if self.firstrun:
-                        opus_decoder = OpusDecoder()
-                        opus_decoder.set_channels(self.RDS["ContentInfo"]["channel"])
-                        opus_decoder.set_sampling_frequency(self.RDS["ContentInfo"]["samplerates"])
+                        decodecodec = datadecoded["channel"][self.readchannel]["RDS"]["ContentInfo"]["Codec"]
+                        if decodecodec.upper() == "OPUS":
+                            opus_decoder = OpusDecoder()
+                            opus_decoder.set_channels(self.RDS["ContentInfo"]["channel"])
+                            opus_decoder.set_sampling_frequency(self.RDS["ContentInfo"]["samplerates"])
                         streamoutput = self.paudio.open(format=pyaudio.paInt16, channels=self.RDS["ContentInfo"]["channel"], rate=self.RDS["ContentInfo"]["samplerates"], output=True, output_device_index=self.device_index_output)
                         evaluation_audio_X = np.fft.fftfreq(1024, 1.0 / self.RDS["ContentInfo"]["samplerates"])[:1024 // 2]
                         if len(datadecoded["channel"]) > 1:
@@ -269,7 +272,6 @@ class App:
                             dpg.configure_item("mediachannelselect", show=True, default_value=channel_info[self.readchannel - 1])
                         elif self.firststart:
                             self.readchannel = datadecoded["mainchannel"]
-
                         # check if channel is encrypted
                         if datadecoded["channel"][self.readchannel]["Encrypt"]:
                             dpg.configure_item("requestpasswordpopup", show=True)
@@ -302,7 +304,10 @@ class App:
                                 dpg.configure_item("serverstatus", default_value="Decrypt Error", color=(255, 0, 0))
 
                         if self.ccisdecrypt or not self.ccisencrypt:
-                            decoded_pcm = opus_decoder.decode(memoryview(bytearray(data)))
+                            if decodecodec.upper() == "OPUS":
+                                decoded_pcm = opus_decoder.decode(memoryview(bytearray(data)))
+                            else: # pcm
+                                decoded_pcm = data
 
                             # Check if the decoded PCM is empty or not
                             if len(decoded_pcm) > 0:
@@ -485,6 +490,8 @@ class App:
     def init(self):
         if self.config["debug"]["hideconsole"] == "true":
             ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
+
+        ctypes.CDLL("opus.dll")
 
         dpg.create_context()
         dpg.create_viewport(title=f'IDRB Client v1.5 Beta', width=1280, height=720, large_icon="IDRBfavicon.ico")  # set viewport window

@@ -12,7 +12,8 @@ a = Analysis(
 		('config.ini', '.'),  # Example source ('config.ini') and destination ('.') paths
 		('IDRBfavicon.ico', '.'),
 		('IDRBfavicon.png', '.'),
-		('IDRBlogo.png', '.')
+		('IDRBlogo.png', '.'),
+		('opus.dll', '.')
 	],
     hiddenimports=[],
     hookspath=[],
