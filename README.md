@@ -36,3 +36,4 @@ IDRB is a novel internet radio broadcasting alternative that uses HLS/DASH/HTTP 
 - [x] Mono
 - [x] Stereo
 - [ ] 5.1/7.1 surround (opus/pcm)
+- [ ] Dolby Atmos 
