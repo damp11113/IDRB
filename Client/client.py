@@ -438,7 +438,7 @@ class App:
                         dpg.add_text(i)
 
             dpg.add_spacer(height=20)
-            dpg.add_text(f"Copyright (C) 2023 ThaiSDR All rights reserved. (GPLv3)")
+            dpg.add_text(f"Copyright (C) 2023 damp11113 All rights reserved. (GPLv3)")
 
         with dpg.window(label="Password Required", tag="requestpasswordpopup", modal=True, no_resize=True, no_close=True, no_move=True, show=False):
             dpg.add_text("This channel is encrypt! Please enter password for decrypt.")
