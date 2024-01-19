@@ -7,6 +7,7 @@ import socket
 import numpy as np
 import pickle
 import pyaudio
+import zmq
 from pyogg import OpusDecoder
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import scrypt
@@ -92,18 +93,27 @@ class App:
         self.ccisdecrypt = None
         self.ccisdecryptpassword = None
         self.paudio = pyaudio.PyAudio()
+        self.cprotocol = None
 
     def connecttoserver(self, sender, data):
         dpg.configure_item("connectservergroup", show=False)
-        #protocol = dpg.get_value("serverprotocol")
+        protocol = dpg.get_value("serverprotocol")
+        self.cprotocol = protocol
         dpg.configure_item("serverstatus", default_value='connecting...', color=(255, 255, 0))
         ip = dpg.get_value("serverip")
         port = dpg.get_value("serverport")
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            s.connect((ip, port))
-        except:
-            dpg.configure_item("connectbutton", show=True)
+        if protocol == "TCP":
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                s.connect((ip, port))
+            except:
+                dpg.configure_item("connectbutton", show=True)
+        elif protocol == "ZeroMQ":
+            context = zmq.Context()
+            s = context.socket(zmq.SUB)
+            s.connect(f"tcp://{ip}:{port}")
+            s.setsockopt_string(zmq.SUBSCRIBE, "")
+
         self.working = True
 
         self.device_index_output = 0
@@ -196,14 +206,19 @@ class App:
         while True:
             try:
                 if self.working:
-                    data = b''
-                    #data = socket.recv(1580152)
-                    while True:
-                        part = socket.recv(1024)
-                        data += part
-                        if len(part) < 1024:
-                            # either 0 or end of data
-                            break
+                    if self.cprotocol == "TCP":
+                        data = b''
+                        #data = socket.recv(1580152)
+                        while True:
+                            part = socket.recv(1024)
+                            data += part
+                            if len(part) < 1024:
+                                # either 0 or end of data
+                                break
+                    elif self.cprotocol == "ZeroMQ":
+                        data = socket.recv()
+                    else:
+                        data = b""
 
                     bytesconunt += len(data)
 
@@ -363,11 +378,11 @@ class App:
             dpg.add_spacer()
             dpg.add_image("station_logo", show=False, tag="station_logo_config")
             dpg.add_text("", tag="RDSinfo", show=False)
-            with dpg.child_window(tag="connectservergroup", label="Server", use_internal_label=True, height=105):
+            with dpg.child_window(tag="connectservergroup", label="Server", use_internal_label=True, height=130):
                 dpg.add_button(label="select server", tag="selectserverbutton")
                 dpg.add_input_text(label="server ip", tag="serverip", default_value="localhost")
                 dpg.add_input_int(label="port", tag="serverport", max_value=65535, default_value=6980)
-                #dpg.add_combo(["TCP", "Websocket"], label="protocol", tag="serverprotocol", default_value="TCP")
+                dpg.add_combo(["TCP", "ZeroMQ"], label="protocol", tag="serverprotocol", default_value="TCP")
                 dpg.add_button(label="connect", callback=self.connecttoserver, tag="connectbutton")
             dpg.add_spacer()
             dpg.add_button(label="More RDS info", callback=lambda: dpg.configure_item("RDSwindow", show=True), tag="morerdsbutton", show=False)
