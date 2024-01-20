@@ -113,7 +113,12 @@ class App:
             s = context.socket(zmq.SUB)
             s.connect(f"tcp://{ip}:{port}")
             s.setsockopt_string(zmq.SUBSCRIBE, "")
-
+        elif protocol == "ZeroMQ (WS)":
+            context = zmq.Context()
+            s = context.socket(zmq.SUB)
+            s.connect(f"ws://{ip}:{port}")
+            s.setsockopt_string(zmq.SUBSCRIBE, "")
+            self.cprotocol = "ZeroMQ"
         self.working = True
 
         self.device_index_output = 0
@@ -382,7 +387,7 @@ class App:
                 dpg.add_button(label="select server", tag="selectserverbutton")
                 dpg.add_input_text(label="server ip", tag="serverip", default_value="localhost")
                 dpg.add_input_int(label="port", tag="serverport", max_value=65535, default_value=6980)
-                dpg.add_combo(["TCP", "ZeroMQ"], label="protocol", tag="serverprotocol", default_value="TCP")
+                dpg.add_combo(["TCP", "ZeroMQ", "ZeroMQ (WS)"], label="protocol", tag="serverprotocol", default_value="TCP")
                 dpg.add_button(label="connect", callback=self.connecttoserver, tag="connectbutton")
             dpg.add_spacer()
             dpg.add_button(label="More RDS info", callback=lambda: dpg.configure_item("RDSwindow", show=True), tag="morerdsbutton", show=False)

@@ -39,7 +39,7 @@ def encrypt_data(message_bytes, password):
     return encrypted_message, salt, iv
 
 
-protocol = "ZMQ"
+protocol = "ZMQ_WS"
 server_port = ('*', 6980)
 
 if protocol == "TCP":
@@ -52,6 +52,11 @@ elif protocol == "ZMQ":
     context = zmq.Context()
     s = context.socket(zmq.PUB)
     s.bind(f"tcp://{server_port[0]}:{server_port[1]}")
+elif protocol == "ZMQ_WS":
+    context = zmq.Context()
+    s = context.socket(zmq.PUB)
+    s.bind(f"ws://{server_port[0]}:{server_port[1]}")
+    protocol = "ZMQ"
 else:
     print(f"{protocol} not supported")
     exit()
