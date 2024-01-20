@@ -18,6 +18,7 @@ IDRB is a novel internet radio broadcasting alternative that uses HLS/DASH/HTTP 
 ## Protocol
 - [x] TCP
 - [x] [ZeroMQ](https://zeromq.org/)
+- [ ] [ZeroMQ (WebSocket)](https://zeromq.org/)
 - [ ] UDP
 - [ ] WebSocket
 - [ ] Socketio
