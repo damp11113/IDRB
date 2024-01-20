@@ -14,6 +14,7 @@ IDRB is a novel internet radio broadcasting alternative that uses HLS/DASH/HTTP 
 - [ ] [EPG](https://en.wikipedia.org/wiki/Electronic_program_guide) (on RDS)
 - [ ] AS (Alternative Server) (on RDS)
 - [ ] [EOM](https://en.wikipedia.org/wiki/Enhanced_other_networks) (on RDS)
+- [ ] Low bandwidth using
 
 ## Protocol
 - [x] TCP
