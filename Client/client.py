@@ -94,6 +94,8 @@ class App:
         self.ccisdecryptpassword = None
         self.paudio = pyaudio.PyAudio()
         self.cprotocol = None
+        self.cciswaitlogoim = True
+        self.ccthreadlogorecisworking = False
 
     def connecttoserver(self, sender, data):
         dpg.configure_item("connectservergroup", show=False)
@@ -149,6 +151,8 @@ class App:
         self.ccisencrypt = None
         self.ccisdecrypt = None
         self.ccisdecryptpassword = None
+        self.cciswaitlogoim = True
+        self.ccthreadlogorecisworking = False
 
     def RDSshow(self):
         try:
@@ -160,11 +164,54 @@ class App:
             dpg.configure_item("RDSCTlocal", default_value="Time Local: " + datetime.fromtimestamp(self.RDS["CT"]["Local"]).strftime('%H:%M:%S'))
             dpg.configure_item("RDSCTUTC", default_value="Time UTC: " + datetime.fromtimestamp(self.RDS["CT"]["UTC"]).strftime('%H:%M:%S'))
             try:
-                dpg.set_value("station_logo", CV22DPG(
-                    cv2.imdecode(np.frombuffer(self.RDS["images"]["logo"], np.uint8),
-                                 cv2.IMREAD_COLOR)))
-            except:
+                if self.RDS["images"]["logo"]["lazy"] and not self.ccthreadlogorecisworking:
+                    if not self.RDS["images"]["logo"]["contents"] == b'':
+                        print(self.RDS["images"]["logo"]["contents"] == b'',
+                            self.RDS["images"]["logo"]["part"]["total"] == \
+                            self.RDS["images"]["logo"]["part"]["current"],
+                            self.RDS["images"]["logo"]["part"]["current"] > 0)
+                        self.ccthreadlogorecisworking = True
+                        logoreciveprocessingthread = threading.Thread(target=self.RDSlogorecivelazy)
+                        logoreciveprocessingthread.start()
+                else:
+                    if not self.RDS["images"]["logo"]["lazy"]:
+                        dpg.set_value("station_logo", CV22DPG(cv2.imdecode(np.frombuffer(self.RDS["images"]["logo"], np.uint8), cv2.IMREAD_COLOR)))
+            except Exception as e:
                 dpg.configure_item("station_logo_config", show=False)
+                print(e)
+
+        except Exception as e:
+            pass
+
+    def RDSlogorecivelazy(self):
+        try:
+            received_data = b""
+            received_data_current_past = b""
+            received_data_current = b""
+            try:
+                print(self.RDS["images"]["logo"]["part"]["current"], self.RDS["images"]["logo"]["part"]["total"])
+                while not self.RDS["images"]["logo"]["part"]["current"] == self.RDS["images"]["logo"]["part"]["total"]:
+                    currentprocess = self.RDS["images"]["logo"]["part"]["current"]
+                    totalprocess = self.RDS["images"]["logo"]["part"]["total"]
+
+                    received_data_current = self.RDS["images"]["logo"]["contents"]
+
+                    if received_data_current != received_data_current_past:
+                        print(received_data_current)
+                        received_data_current_past = received_data_current
+                        received_data += received_data_current
+
+                    dpg.configure_item("logostatus", color=(255, 255, 0), default_value=f"Receiving... ({currentprocess}/{totalprocess})")
+
+                dpg.set_value("station_logo", CV22DPG(cv2.imdecode(np.frombuffer(received_data_current, np.uint8), cv2.IMREAD_COLOR)))
+                dpg.configure_item("logostatus", color=(0, 255, 0), default_value=f"Received logo! waiting for new image...")
+                dpg.configure_item("station_logo_config", show=True)
+                self.ccthreadlogorecisworking = False
+            except Exception as e:
+                print("receive error", e)
+                dpg.configure_item("logostatus", color=(255, 0, 0), default_value=f"Receive logo error! waiting for new image...")
+                dpg.configure_item("station_logo_config", show=False)
+                self.ccthreadlogorecisworking = False
 
         except Exception as e:
             pass
@@ -297,9 +344,21 @@ class App:
                             dpg.configure_item("mediachannelselect", show=True, items=channel_info)
                         dpg.configure_item("morerdsbutton", show=True)
                         dpg.configure_item("serverinfobutton", show=True)
+                        dpg.configure_item("logostatus", show=True)
                         try:
-                            dpg.set_value("station_logo", CV22DPG(cv2.imdecode(np.frombuffer(datadecoded["channel"][self.readchannel]["RDS"]["images"]["logo"], np.uint8), cv2.IMREAD_COLOR)))
-                            dpg.configure_item("station_logo_config", show=True)
+                            if self.RDS["images"]["logo"]["lazy"] and not self.ccthreadlogorecisworking:
+                                if not self.RDS["images"]["logo"]["contents"] == b'' or \
+                                        self.RDS["images"]["logo"]["part"]["total"] == \
+                                        self.RDS["images"]["logo"]["part"]["current"] or \
+                                        self.RDS["images"]["logo"]["part"]["current"] > 0:
+                                    self.ccthreadlogorecisworking = True
+                                    logoreciveprocessingthread = threading.Thread(target=self.RDSlogorecivelazy)
+                                    logoreciveprocessingthread.start()
+                            else:
+                                if not self.RDS["images"]["logo"]["lazy"]:
+                                    dpg.set_value("station_logo", CV22DPG(
+                                        cv2.imdecode(np.frombuffer(self.RDS["images"]["logo"], np.uint8),
+                                                     cv2.IMREAD_COLOR)))
                         except:
                             dpg.configure_item("station_logo_config", show=False)
                         dpg.configure_item("disconnectbutton", show=True)
@@ -436,6 +495,7 @@ class App:
             dpg.add_combo([], label="Channel", tag="mediachannelselect", default_value="Main Channel", show=False, callback=self.changechannel)
             dpg.add_spacer()
             dpg.add_image("station_logo", show=False, tag="station_logo_config")
+            dpg.add_text("Logo not available", tag="logostatus", color=(255, 0, 0), show=False)
             dpg.add_text("", tag="RDSinfo", show=False)
             with dpg.child_window(tag="connectservergroup", label="Server", use_internal_label=True, height=130):
                 dpg.add_button(label="select server", tag="selectserverbutton")

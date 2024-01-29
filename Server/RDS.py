@@ -1,9 +1,7 @@
 import time
 from datetime import datetime
-
 import cv2
 import numpy as np
-
 from damp11113 import scrollTextBySteps
 
 
@@ -14,6 +12,28 @@ def encodelogoimage(path, quality=50):
     result, encoded_image = cv2.imencode('.jpg', image, encode_param)
     encoded_bytes = np.array(encoded_image).tobytes()
     return encoded_bytes
+
+def sendimagelazy(data, chunk_size, RDSimage, imagetype, delay=0.1):
+    if not RDSimage["images"][imagetype]["lazy"]:
+        RDSimage["images"][imagetype]["contents"] = data
+        return
+
+    # Break the data into chunks
+    chunks = [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
+    total_chunks = len(chunks)
+    RDSimage["images"][imagetype]["part"]["total"] = total_chunks
+
+    # Send each chunk
+    for i, chunk in enumerate(chunks):
+        RDSimage["images"][imagetype]["contents"] = chunk
+        RDSimage["images"][imagetype]["part"]["current"] = i
+
+        print(f"[contentpart={chunk}, currentpart={i}, totalpart={total_chunks}]")
+        time.sleep(delay)
+
+    RDSimage["images"][imagetype]["contents"] = b''
+    RDSimage["images"][imagetype]["part"]["current"] = 0
+    RDSimage["images"][imagetype]["part"]["total"] = 0
 
 RDS = {
     "PS": "DPRadio",
@@ -53,7 +73,14 @@ RDS = {
         "samplerates": 48000
     },
     "images": {
-        "logo": encodelogoimage(r"C:\Users\sansw\3D Objects\dpstream iptv logo.png")
+        "logo": {
+            "lazy": True,
+            'contents': b'',
+            "part": {
+                "current": 0,
+                "total": 0
+            }
+        }
     }
 }
 
@@ -120,10 +147,10 @@ def update_RDS_time():
 def update_RDS_images():
     global RDS
     while True:
-        RDS["images"]["logo"] = encodelogoimage(r"C:\Users\sansw\3D Objects\dpstream iptv logo.png", 25)
+        sendimagelazy(encodelogoimage(r"C:\Users\sansw\3D Objects\dpstream iptv logo.png", 25), 100, RDS, "logo")
         time.sleep(10)
-        RDS["images"]["logo"] = encodelogoimage(r"C:\Users\sansw\3D Objects\140702_hi-res-logo.jpg", 25)
+        sendimagelazy(encodelogoimage(r"C:\Users\sansw\3D Objects\140702_hi-res-logo.jpg", 25), 100, RDS, "logo")
         time.sleep(10)
-        RDS["images"]["logo"] = encodelogoimage(r"IDRBfavicon.jpg", 25)
+        sendimagelazy(encodelogoimage(r"IDRBfavicon.jpg", 25), 100, RDS, "logo")
         time.sleep(10)
 
