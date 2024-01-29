@@ -53,7 +53,7 @@ RDS = {
         "samplerates": 48000
     },
     "images": {
-        "logo": encodelogoimage(r"C:\Users\sansw\3D Objects\dpstream iptv logo.png")
+        "logo": encodelogoimage(r"IDRBfavicon.jpg", 25)
     }
 }
 
@@ -120,9 +120,9 @@ def update_RDS_time():
 def update_RDS_images():
     global RDS
     while True:
-        RDS["images"]["logo"] = encodelogoimage(r"C:\Users\sansw\3D Objects\dpstream iptv logo.png", 25)
+        RDS["images"]["logo"] = encodelogoimage(r"dpstream iptv logo.png", 25)
         time.sleep(10)
-        RDS["images"]["logo"] = encodelogoimage(r"C:\Users\sansw\3D Objects\140702_hi-res-logo.jpg", 25)
+        RDS["images"]["logo"] = encodelogoimage(r"140702_hi-res-logo.jpg", 25)
         time.sleep(10)
         RDS["images"]["logo"] = encodelogoimage(r"IDRBfavicon.jpg", 25)
         time.sleep(10)

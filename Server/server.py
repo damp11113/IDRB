@@ -11,6 +11,7 @@ from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import scrypt
 from Crypto.Random import get_random_bytes
 import zmq
+import wave
 
 def pad_message(message_bytes):
     block_size = AES.block_size
@@ -41,6 +42,7 @@ def encrypt_data(message_bytes, password):
 
 protocol = "ZMQ_WS"
 server_port = ('*', 6980)
+#server_port = ('0.0.0.0', 6980)
 
 if protocol == "TCP":
     # create tcp
@@ -64,28 +66,8 @@ else:
 p = pyaudio.PyAudio()
 
 sample_rate = 48000
-bytes_per_sample = p.get_sample_size(pyaudio.paInt16)
 
-
-device_name_input = "Line 5 (Virtual Audio Cable)"
-device_index_input = 0
-for i in range(p.get_device_count()):
-    dev = p.get_device_info_by_index(i)
-    if dev['name'] == device_name_input:
-        device_index_input = dev['index']
-        break
-
-device_name_input = "Line 4 (Virtual Audio Cable)"
-device_index_input2 = 0
-for i in range(p.get_device_count()):
-    dev = p.get_device_info_by_index(i)
-    if dev['name'] == device_name_input:
-        device_index_input2 = dev['index']
-        break
-
-streaminput = p.open(format=pyaudio.paInt16, channels=2, rate=sample_rate, input=True, input_device_index=device_index_input)
-streaminput2 = p.open(format=pyaudio.paInt16, channels=2, rate=sample_rate, input=True, input_device_index=device_index_input2)
-
+wf = wave.open("testaudio.wav", 'rb')
 
 thread = threading.Thread(target=_RDS.update_RDS)
 thread.start()
@@ -109,15 +91,27 @@ def encode_audio():
     encoder.set_channels(_RDS.RDS["ContentInfo"]["channel"])
     encoder.set_bitrates(_RDS.RDS["ContentInfo"]["bitrate"])
     encoder.set_frame_size(60)
-
+    print("audio incoming server is running")
     while True:
-        pcm = np.frombuffer(streaminput.read(1024, exception_on_overflow=False), dtype=np.int16)
+        stin = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # wait for connection
+        stin.bind(("0.0.0.0", 9861))
+        stin.listen(2)
+        conn, addr = stin.accept()
 
-        encoded_packets = encoder.buffered_encode(memoryview(bytearray(pcm)))
-        for encoded_packet, _, _ in encoded_packets:
-            # Put the encoded audio into the buffer
+        while True:
+            try:
+                pcm = np.frombuffer(conn.recv(1024), dtype=np.int16)
 
-            channel1.put(encoded_packet.tobytes())
+                encoded_packets = encoder.buffered_encode(memoryview(bytearray(pcm)))
+                for encoded_packet, _, _ in encoded_packets:
+                    # Put the encoded audio into the buffer
+
+                    channel1.put(encoded_packet.tobytes())
+            except Exception as e:
+                print(e)
+                break
+
 
 def encode_audio2():
     encoder2 = OpusBufferedEncoder()
@@ -140,8 +134,8 @@ def encode_audio2():
 audio_thread = threading.Thread(target=encode_audio)
 audio_thread.start()
 
-audio_thread2 = threading.Thread(target=encode_audio2)
-audio_thread2.start()
+#audio_thread2 = threading.Thread(target=encode_audio2)
+#audio_thread2.start()
 
 connectionlist = []
 
@@ -181,14 +175,17 @@ def handle_client():
     try:
         while True:
             # Get the encoded audio from the buffer
-            ENchannel1 = channel1.get()
+            try:
+                ENchannel1 = channel1.get(timeout=0.1)
+            except:
+                ENchannel1 = b""
 
             # encrypt data
             #ENC1encrypted, ENC1salt, ENC1iv = encrypt_data(ENchannel1, "password")
 
             #ENchannel1 = ENC1encrypted + b'|||||' + ENC1salt + b'|||||' + ENC1iv
 
-            ENchannel2 = channel2.get()
+            #ENchannel2 = channel2.get()
             content = {
                 "first": False,
                 "mainchannel": 1,
@@ -200,13 +197,13 @@ def handle_client():
                         "Content": ENchannel1,
                         "RDS": _RDS.RDS
                     },
-                    2: {
-                        "Station": "DPTest",
-                        "Encrypt": b'|||||' in ENchannel2,
-                        "ContentSize": len(ENchannel2),
-                        "Content": ENchannel2,
-                        "RDS": _RDS.RDS2
-                    }
+                    #2: {
+                    #    "Station": "DPTest",
+                    #    "Encrypt": b'|||||' in ENchannel2,
+                    #    "ContentSize": len(ENchannel2),
+                    #    "Content": ENchannel2,
+                    #    "RDS": _RDS.RDS2
+                    #}
                 },
                 "serverinfo": {
                     "Listener": connected_users,
@@ -234,6 +231,7 @@ def handle_client():
                 s.send(pickle.dumps(content))
     except Exception as e:
         print(f'Error: {e}')
+        raise e
 
 # Your main server logic using threading for handling connections
 if __name__ == "__main__":
