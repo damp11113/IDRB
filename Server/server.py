@@ -11,6 +11,9 @@ from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import scrypt
 from Crypto.Random import get_random_bytes
 import zmq
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def pad_message(message_bytes):
     block_size = AES.block_size
@@ -66,7 +69,7 @@ p = pyaudio.PyAudio()
 sample_rate = 48000
 bytes_per_sample = p.get_sample_size(pyaudio.paInt16)
 
-
+logging.info('init audio device')
 device_name_input = "Line 5 (Virtual Audio Cable)"
 device_index_input = 0
 for i in range(p.get_device_count()):
@@ -86,7 +89,7 @@ for i in range(p.get_device_count()):
 streaminput = p.open(format=pyaudio.paInt16, channels=2, rate=sample_rate, input=True, input_device_index=device_index_input)
 streaminput2 = p.open(format=pyaudio.paInt16, channels=2, rate=sample_rate, input=True, input_device_index=device_index_input2)
 
-
+logging.info('starting RDS')
 thread = threading.Thread(target=_RDS.update_RDS)
 thread.start()
 
@@ -136,6 +139,8 @@ def encode_audio2():
             channel2.put(encoded_packet.tobytes())
 
         #channel2.put(pcm2.tobytes()) # if you use pcm
+
+logging.info('starting audio encoding')
 
 audio_thread = threading.Thread(target=encode_audio)
 audio_thread.start()
@@ -237,7 +242,7 @@ def handle_client():
 
 # Your main server logic using threading for handling connections
 if __name__ == "__main__":
-    print("server is running")
+    logging.info('server is running')
     if protocol == "TCP":
         while True:
             print("Waiting for a connection...")
