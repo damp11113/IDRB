@@ -241,7 +241,6 @@ class App:
 
                     if len(data) == 0:
                         dpg.configure_item("serverstatus", default_value='lost connected', color=(255, 0, 0))
-<<<<<<< Updated upstream
                         socket.close()
                         if self.cprotocol == "TCP":
                             socket.close()
@@ -257,23 +256,6 @@ class App:
                                     break  # No more messages
                                 else:
                                     raise
-=======
-                        if self.cprotocol == "TCP":
-                            socket.close()
-                        elif self.cprotocol == "ZeroMQ":
-                            while True:
-                                try:
-                                    message = socket.recv(zmq.NOBLOCK)
-                                    if message is None:
-                                        break  # No more messages
-                                    # Process the received message if needed
-                                    print(f"Received message: {message.decode()}")
-                                except zmq.error.ZMQError as e:
-                                    if e.errno == zmq.EAGAIN:
-                                        break  # No more messages
-                                    else:
-                                        raise
->>>>>>> Stashed changes
                             socket.close()
                         else:
                             socket.close()
@@ -342,11 +324,7 @@ class App:
                         data = datadecoded["channel"][self.readchannel]["Content"]
 
                         if len(data) == 0:
-<<<<<<< Updated upstream
                             dpg.configure_item("serverstatus", default_value=f'connected but no audio', color=(255, 0, 0))
-=======
-                            dpg.configure_item("serverstatus", default_value=f'connected No audio', color=(255, 0, 0))
->>>>>>> Stashed changes
 
                         if self.ccisdecryptpassword and self.ccisencrypt:
                             try:
@@ -400,7 +378,6 @@ class App:
                     bytesconunt_frame += 1
                 else:
                     streamoutput.close()
-<<<<<<< Updated upstream
                     if self.cprotocol == "TCP":
                         socket.close()
                     elif self.cprotocol == "ZeroMQ":
@@ -415,24 +392,6 @@ class App:
                                 break  # No more messages
                             else:
                                 raise
-=======
-                    socket.close()
-                    if self.cprotocol == "TCP":
-                        socket.close()
-                    elif self.cprotocol == "ZeroMQ":
-                        while True:
-                            try:
-                                message = socket.recv(zmq.NOBLOCK)
-                                if message is None:
-                                    break  # No more messages
-                                # Process the received message if needed
-                                print(f"Received message: {message.decode()}")
-                            except zmq.error.ZMQError as e:
-                                if e.errno == zmq.EAGAIN:
-                                    break  # No more messages
-                                else:
-                                    raise
->>>>>>> Stashed changes
                         socket.close()
                     else:
                         socket.close()
@@ -447,7 +406,6 @@ class App:
                         streamoutput.close()
                     except:
                         pass
-<<<<<<< Updated upstream
                     socket.close()
                     if self.cprotocol == "TCP":
                         socket.close()
@@ -463,23 +421,6 @@ class App:
                                 break  # No more messages
                             else:
                                 raise
-=======
-                    if self.cprotocol == "TCP":
-                        socket.close()
-                    elif self.cprotocol == "ZeroMQ":
-                        while True:
-                            try:
-                                message = socket.recv(zmq.NOBLOCK)
-                                if message is None:
-                                    break  # No more messages
-                                # Process the received message if needed
-                                print(f"Received message: {message.decode()}")
-                            except zmq.error.ZMQError as e:
-                                if e.errno == zmq.EAGAIN:
-                                    break  # No more messages
-                                else:
-                                    raise
->>>>>>> Stashed changes
                         socket.close()
                     else:
                         socket.close()
