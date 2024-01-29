@@ -242,6 +242,23 @@ class App:
                     if len(data) == 0:
                         dpg.configure_item("serverstatus", default_value='lost connected', color=(255, 0, 0))
                         socket.close()
+                        if self.cprotocol == "TCP":
+                            socket.close()
+                        elif self.cprotocol == "ZeroMQ":
+                            try:
+                                message = socket.recv(zmq.NOBLOCK)
+                                if message is None:
+                                    break  # No more messages
+                                # Process the received message if needed
+                                print(f"Received message: {message.decode()}")
+                            except zmq.error.ZMQError as e:
+                                if e.errno == zmq.EAGAIN:
+                                    break  # No more messages
+                                else:
+                                    raise
+                            socket.close()
+                        else:
+                            socket.close()
                         self.disconnectserver()
                         break
 
@@ -306,6 +323,9 @@ class App:
                     if not self.firstrun:
                         data = datadecoded["channel"][self.readchannel]["Content"]
 
+                        if len(data) == 0:
+                            dpg.configure_item("serverstatus", default_value=f'connected but no audio', color=(255, 0, 0))
+
                         if self.ccisdecryptpassword and self.ccisencrypt:
                             try:
                                 # decrypt data
@@ -358,7 +378,24 @@ class App:
                     bytesconunt_frame += 1
                 else:
                     streamoutput.close()
-                    socket.close()
+                    if self.cprotocol == "TCP":
+                        socket.close()
+                    elif self.cprotocol == "ZeroMQ":
+                        try:
+                            message = socket.recv(zmq.NOBLOCK)
+                            if message is None:
+                                break  # No more messages
+                            # Process the received message if needed
+                            print(f"Received message: {message.decode()}")
+                        except zmq.error.ZMQError as e:
+                            if e.errno == zmq.EAGAIN:
+                                break  # No more messages
+                            else:
+                                raise
+                        socket.close()
+                    else:
+                        socket.close()
+                    self.disconnectserver()
                     break
             except Exception as e:
                 if str(e) == "An error occurred while decoding an Opus-encoded packet: corrupted stream":
@@ -370,6 +407,23 @@ class App:
                     except:
                         pass
                     socket.close()
+                    if self.cprotocol == "TCP":
+                        socket.close()
+                    elif self.cprotocol == "ZeroMQ":
+                        try:
+                            message = socket.recv(zmq.NOBLOCK)
+                            if message is None:
+                                break  # No more messages
+                            # Process the received message if needed
+                            print(f"Received message: {message.decode()}")
+                        except zmq.error.ZMQError as e:
+                            if e.errno == zmq.EAGAIN:
+                                break  # No more messages
+                            else:
+                                raise
+                        socket.close()
+                    else:
+                        socket.close()
                     self.disconnectserver()
                     raise
                     break
