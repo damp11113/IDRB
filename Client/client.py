@@ -66,6 +66,7 @@ class App:
     def connecttoserverwithpubselect(self, sender, data):
         self.ccconwithpubselect = True
         dpg.configure_item("pubserverselectwindow", show=False)
+        dpg.configure_item("connectbuttonpubserverselect", show=False)
         self.connecttoserver(None, None)
 
     def connecttoserver(self, sender, data):
