@@ -1,9 +1,30 @@
+"""
+This file is part of IDRB Project.
+
+IDRB Project is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+IDRB Project is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with IDRB Project.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import time
 from datetime import datetime
 import cv2
 import numpy as np
 from damp11113 import scrollTextBySteps
+import threading
+import Settings
+import logging
 
+RDSLog = logging.getLogger("RDS")
 
 def encodelogoimage(path, quality=50):
     image = cv2.resize(cv2.imread(path), (128, 128))
@@ -28,12 +49,21 @@ def sendimagelazy(data, chunk_size, RDSimage, imagetype, delay=0.1):
         RDSimage["images"][imagetype]["contents"] = chunk
         RDSimage["images"][imagetype]["part"]["current"] = i
 
-        print(f"[contentpart={chunk}, currentpart={i}, totalpart={total_chunks}]")
+        #print(f"[contentpart={chunk}, currentpart={i}, totalpart={total_chunks}]")
         time.sleep(delay)
 
     RDSimage["images"][imagetype]["contents"] = b''
     RDSimage["images"][imagetype]["part"]["current"] = 0
     RDSimage["images"][imagetype]["part"]["total"] = 0
+
+ServerRDS = {
+    "ServerName": Settings.ServerName,
+    "ServerDesc": Settings.ServerDesc,
+    "Country": Settings.Country,
+    "AS": [ # AS = Alternative Server
+        # can add more server here
+    ]
+}
 
 RDS = {
     "PS": "DPRadio",
@@ -60,11 +90,11 @@ RDS = {
     "Compressed": False,
     "DyPTY": False,
     "EPG": None,
-    "AS": [ # AS = Alternative Server
-        # can add more server here
-    ],
     "EON": [
         # can add more here
+    ],
+    "AS": [ # AS = Alternative Server
+        # can add more server here
     ],
     "ContentInfo": {
         "Codec": "opus",
@@ -74,7 +104,7 @@ RDS = {
     },
     "images": {
         "logo": {
-            "lazy": True,
+            "lazy": False,
             'contents': b'',
             "part": {
                 "current": 0,
@@ -109,10 +139,10 @@ RDS2 = {
     "Compressed": False,
     "DyPTY": False,
     "EPG": None,
-    "AS": [ # AS = Alternative Server
+    "EON": [
         # can add more server here
     ],
-    "EON": [
+    "AS": [ # AS = Alternative Server
         # can add more server here
     ],
     "ContentInfo": {
@@ -126,8 +156,8 @@ RDS2 = {
     }
 }
 
-
 def update_RDS():
+    RDSLog.info("Starting RDS Users...")
     global RDS
     while True:
         pstext = "DPRadio Testing Broadcasting          "
@@ -136,6 +166,7 @@ def update_RDS():
             time.sleep(1)
 
 def update_RDS_time():
+    RDSLog.info("Starting RDS Times...")
     global RDS
     while True:
         RDS["CT"]["Local"] = datetime.now().timestamp()
@@ -145,6 +176,7 @@ def update_RDS_time():
         time.sleep(1)
 
 def update_RDS_images():
+    RDSLog.info("Starting RDS Images...")
     global RDS
     while True:
         sendimagelazy(encodelogoimage(r"C:\Users\sansw\3D Objects\dpstream iptv logo.png", 25), 100, RDS, "logo")
@@ -153,4 +185,14 @@ def update_RDS_images():
         time.sleep(10)
         sendimagelazy(encodelogoimage(r"IDRBfavicon.jpg", 25), 100, RDS, "logo")
         time.sleep(10)
+
+def startRDSThread():
+    RDSLog.info("Starting RDS...")
+    thread = threading.Thread(target=update_RDS)
+    thread2 = threading.Thread(target=update_RDS_time)
+    thread3 = threading.Thread(target=update_RDS_images)
+
+    thread.start()
+    thread2.start()
+    thread3.start()
 
