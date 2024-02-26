@@ -3,7 +3,11 @@
 # IDRB (Internet Digital Radio Broadcasting) System
 IDRB is a novel internet radio broadcasting alternative that uses HLS/DASH/HTTP streams, transferring over TCP/IP. This system supports images and RDS (Dynamic update) capabilities, enabling the transmission of station information. Additionally, it allows for setting station logos and images. IDRB offers multi-broadcasting functionalities and currently supports the Opus codec, with plans to incorporate PCM, MP2/3, AAC/AAC+, and more in the future, ensuring low delay. If you find this project intriguing.
 
+# Previews
 ![preview](https://github.com/damp11113/IDRB/assets/64675096/ec423b0d-3598-49f3-89bb-8170e9c89563)
+### Server Selector
+![Recording 2024-02-26 200657](https://github.com/damp11113/IDRB/assets/64675096/5bd68eb0-0306-4fbf-86fd-0b3124736fa8)
+
 
 # Fetures
 - [x] Encryption (Beta)
