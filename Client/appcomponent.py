@@ -1,3 +1,20 @@
+"""
+This file is part of IDRB Project.
+
+IDRB Project is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+IDRB Project is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with IDRB Project.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import dearpygui.dearpygui as dpg
 
 from utils import *
@@ -60,7 +77,7 @@ def window(self):
         dpg.add_spacer()
         dpg.add_text("IDRB (Internet Digital Radio Broadcasting System) Client")
         dpg.add_spacer()
-        dpg.add_text(f"IDRB Client v1.6.1 Beta")
+        dpg.add_text(f"IDRB Client v1.6.2 Beta")
         dpg.add_spacer()
 
         desc = "IDRB is a novel internet radio broadcasting alternative that uses HLS/DASH/HTTP streams, transferring over TCP/IP. This system supports images and RDS (Dynamic update) capabilities, enabling the transmission of station information. Additionally, it allows for setting station logos and images. IDRB offers multi-broadcasting functionalities and currently supports the Opus codec, with plans to incorporate PCM, MP2/3, AAC/AAC+, and more in the future, ensuring low delay. If you find this project intriguing, you can support it at damp11113.xyz/support."
@@ -148,8 +165,10 @@ def window(self):
                 dpg.add_text("Please restart software when configured")
                 with dpg.tab_bar():
                     with dpg.tab(label="Audio"):
-                        dpg.add_combo([], label="Output Device", tag="selectaudiooutputdevicecombo",
-                                      callback=self.changeaudiodevice)
+                        dpg.add_combo([], label="Output Device", tag="selectaudiooutputdevicecombo", callback=self.changeaudiodevice)
+                    with dpg.tab(label="Network"):
+                        dpg.add_input_int(label="Buffer Size", tag="buffersizeintinput", callback=self.changebuffersize)
+
 
 def menubar(self):
     with dpg.viewport_menu_bar():

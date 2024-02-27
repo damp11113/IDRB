@@ -15,10 +15,17 @@ You should have received a copy of the GNU General Public License
 along with IDRB Project.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+# To config Muxer you need to goto server.py and find "Config Muxer"
+# To config RDS you need to goto RDS.py
+# To config Encoder you need to goto Encoder.py
+# Do not goto ThaiSDRDir.py and utils.py
+
 # Server Settings
 protocol = "ZMQ_WS" # TCP ZMQ ZMQ_WS
 server_port = ('*', 6980) # if use other protocol ZMQ please use 0.0.0.0
 compression_level = 9 # 0-9
+buffersize = 32 # must be int (on working it use buffersize + (buffersize/2) to standby)
+# low buffersize = low delay
 
 # Server Info
 ServerName = "DPCloudev"
@@ -40,4 +47,4 @@ public = True
 ServerIP = "localhost"
 #ServerPort = server_port[1]
 ServerPort = 6980
-ThaiSDRkey = "1N5LURICLIN1U9QNYZ4MHJ6FNXISFXFELZAX135CFM0HSD17O2.63E60BE9EEA2339C113A15EB"
+ThaiSDRkey = ""

@@ -22,6 +22,8 @@ import threading
 import zmq
 import logging
 import zlib
+import queue
+import math
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s')
 ServerLog = logging.getLogger("IDRBServer")
@@ -61,7 +63,6 @@ _RDS.startRDSThread()
 ServerLog.info('starting audio encoding')
 Encoder.StartEncoder()
 
-
 if protocol == "TCP":
     connected_users = 0
 elif protocol == "ZMQ":
@@ -74,78 +75,98 @@ timestart = time.time()
 connectionlist = []
 first = True
 
+Buffer = queue.Queue(maxsize=math.trunc(Settings.buffersize + (Settings.buffersize/2)))
+
+# ---------------------------------- Config Muxer ---------------------------------------
+
+def Muxer():
+    while True:
+        # Get the encoded audio from the buffer
+        ENchannel1 = Encoder.channel1.get()
+
+        # encrypt data
+        # ENC1encrypted, ENC1salt, ENC1iv = utils.encrypt_data(ENchannel1, "password")
+
+        # ENchannel1 = ENC1encrypted + b'|||||' + ENC1salt + b'|||||' + ENC1iv
+
+        ENchannel2 = Encoder.channel2.get()
+        content = {
+            "first": False,
+            "mainchannel": 1,
+            "channel": {
+                1: {
+                    "Station": "DPRadio+",
+                    "StationDesc": "The best station in the world!",
+                    "Encrypt": b'|||||' in ENchannel1,  # check if encrypt
+                    "ContentSize": len(ENchannel1),
+                    "Content": ENchannel1,
+                    "RDS": _RDS.RDS
+                },
+                2: {
+                    "Station": "DPTest",
+                    "StationDesc": "",
+                    "Encrypt": b'|||||' in ENchannel2,
+                    "ContentSize": len(ENchannel2),
+                    "Content": ENchannel2,
+                    "RDS": _RDS.RDS2
+                }
+            },
+            "serverinfo": {
+                "Listener": connected_users,
+                "Startat": timestart,
+                "RDS": _RDS.ServerRDS
+            }
+        }
+        ThaiSDRDir.content = content
+
+        compressedcontent = zlib.compress(pickle.dumps(content), level=Settings.compression_level)
+
+        Buffer.put(compressedcontent)
+
+# -----------------------------------------------------------------------------------------------
+
 def handle_client():
     global connected_users, first
     try:
         while True:
-            # Get the encoded audio from the buffer
-            ENchannel1 = Encoder.channel1.get()
-
-            # encrypt data
-            #ENC1encrypted, ENC1salt, ENC1iv = utils.encrypt_data(ENchannel1, "password")
-
-            #ENchannel1 = ENC1encrypted + b'|||||' + ENC1salt + b'|||||' + ENC1iv
-
-            ENchannel2 = Encoder.channel2.get()
-            content = {
-                "first": False,
-                "mainchannel": 1,
-                "channel": {
-                    1: {
-                        "Station": "DPRadio+",
-                        "StationDesc": "The best station in the world!",
-                        "Encrypt": b'|||||' in ENchannel1, # check if encrypt
-                        "ContentSize": len(ENchannel1),
-                        "Content": ENchannel1,
-                        "RDS": _RDS.RDS
-                    },
-                    2: {
-                        "Station": "DPTest",
-                        "StationDesc": "",
-                        "Encrypt": b'|||||' in ENchannel2,
-                        "ContentSize": len(ENchannel2),
-                        "Content": ENchannel2,
-                        "RDS": _RDS.RDS2
-                    }
-                },
-                "serverinfo": {
-                    "Listener": connected_users,
-                    "Startat": timestart,
-                    "RDS": _RDS.ServerRDS
-                }
-            }
-            ThaiSDRDir.content = content
-
-            compressedcontent = zlib.compress(pickle.dumps(content), level=Settings.compression_level)
-
-            #connection.sendall(pickle.dumps(content))
-            if protocol == "TCP":
-                for i in connectionlist:
-                    try:
-                        i.sendall(compressedcontent)
-                    except Exception as e:
-                        #print(f'Error sending data to {i.getpeername()}: {e}')
-                        # Remove disconnected client from the list
-                        if i in connectionlist:
-                            i.close()
-                            connectionlist.remove(i)
-                            connected_users -= 1
-                # check if no user
-                if not connectionlist:
-                    first = True
-                    ServerLog.info('server is standby now')
-                    break
-            elif protocol == "ZMQ":
-                s.send(compressedcontent)
+            # Check if the buffer queue has enough data to send
+            if Buffer.qsize() >= Settings.buffersize:  # Adjust the threshold as needed
+                if protocol == "TCP":
+                    for i in connectionlist:
+                        try:
+                            # Send data from the buffer queue to connected clients
+                            for _ in range(Settings.buffersize):
+                                i.sendall(Buffer.get())
+                        except Exception as e:
+                            if i in connectionlist:
+                                i.close()
+                                connectionlist.remove(i)
+                                connected_users -= 1
+                    if not connectionlist:
+                        first = True
+                        ServerLog.info('server is standby now')
+                        break
+                elif protocol == "ZMQ":
+                    # Send data from the buffer queue to ZMQ socket
+                    for _ in range(Settings.buffersize):
+                        s.send(Buffer.get())
     except Exception as e:
         print(f'Error: {e}')
+
 
 # Your main server logic using threading for handling connections
 if __name__ == "__main__":
     if public:
         ServerLog.info('starting ThaiSDR Directory')
         ThaiSDRDir.run()
-    ServerLog.info('server is running')
+
+    ServerLog.info('starting Muxer')
+
+    muxerthread = threading.Thread(target=Muxer)
+    muxerthread.start()
+
+    ServerLog.info('starting server')
+
     if protocol == "TCP":
         while True:
             connection, client_address = s.accept()
@@ -163,3 +184,5 @@ if __name__ == "__main__":
         client_thread = threading.Thread(target=handle_client)
         # client_thread.daemon = True  # Set the thread as a daemon so it exits when the main thread exits
         client_thread.start()
+
+    ServerLog.info('server is running')

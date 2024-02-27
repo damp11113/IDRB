@@ -40,8 +40,7 @@ class App:
         self.config = configparser.ConfigParser()
         self.config.read("config.ini")
         self.device_name_output = self.config["audio"]["device"]
-        self.buffersize = 64 # can configable
-
+        self.buffersize = self.config["network"]["buffersize"]
 
         self.working = False
         self.readchannel = 1
@@ -60,8 +59,6 @@ class App:
         self.lsitem = None
         self.ccconwithpubselect = False
         self.buffer = queue.Queue(maxsize=self.buffersize)
-        self.okbuffer = False
-        self.firstrunbuffer = True
 
     def connecttoserverwithpubselect(self, sender, data):
         self.ccconwithpubselect = True
@@ -125,8 +122,6 @@ class App:
         dpg.configure_item("station_logo_config", show=False)
         dpg.configure_item("RDSinfo", show=False)
         dpg.configure_item("disconnectbutton", show=False)
-        dpg.configure_item("connectservergroup", show=True)
-        dpg.configure_item("serverstatus", default_value='disconnected', color=(255, 0, 0))
         dpg.configure_item("logostatus", show=False)
         self.firstrun = True
         self.firststart = True
@@ -136,9 +131,7 @@ class App:
         self.ccisdecryptpassword = None
         self.cciswaitlogoim = True
         self.ccthreadlogorecisworking = False
-        self.buffer = queue.Queue(maxsize=self.buffersize)
-        self.okbuffer = False
-        self.firstrunbuffer = True
+        # clear buffer
 
     def RDSshow(self):
         try:
@@ -231,6 +224,11 @@ class App:
         self.config["audio"]["device"] = dpg.get_value(sender)
         self.config.write(open('config.ini', 'w'))
 
+    def changebuffersize(self, sender, data):
+        self.buffersize = int(dpg.get_value(sender))
+        self.config["network"]["buffersize"] = str(dpg.get_value(sender))
+        self.config.write(open('config.ini', 'w'))
+
     def pubserverselectone(self, sender, data):
         if data == False:
             dpg.configure_item("connectbuttonpubserverselect", show=False)
@@ -295,25 +293,33 @@ class App:
         self.pubserverselectsearch()
 
     def streambuffer(self, socket):
-        consecutive_above_threshold = 0  # Counter to track consecutive iterations above threshold
-        tolerance_iterations = 5  # Number of consecutive iterations required above threshold
         while self.working:
-            if self.cprotocol == "TCP":
-                tempdata = b''
-                # data = socket.recv(1580152)
-                while True:
-                    part = socket.recv(1024)
-                    tempdata += part
-                    if len(part) < 1024:
-                        # either 0 or end of data
-                        break
-                self.buffer.put(tempdata)
-            elif self.cprotocol == "ZeroMQ":
-                self.buffer.put(socket.recv())
-            else:
-                self.buffer.put(b"")
+            try:
+                if self.cprotocol == "TCP":
+                    tempdata = b''
+                    # data = socket.recv(1580152)
+                    while True:
+                        part = socket.recv(1024)
+                        tempdata += part
+                        if len(part) < 1024:
+                            # either 0 or end of data
+                            break
+                    self.buffer.put(tempdata, timeout=0.1)
+                elif self.cprotocol == "ZeroMQ":
+                    self.buffer.put(socket.recv(), timeout=0.1)
+                else:
+                    self.buffer.put(b"")
 
-            dpg.configure_item("bufferstatus", default_value=f'Buffer: {self.buffer.qsize()}/{self.buffersize}')
+                dpg.configure_item("bufferstatus", default_value=f'Buffer: {self.buffer.qsize()}/{self.buffersize}', color=(0, 255, 0))
+            except queue.Full:
+                dpg.configure_item("bufferstatus", default_value=f'Buffer: {self.buffer.qsize()}/{self.buffersize}', color=(255, 0, 0))
+
+        while not self.buffer.empty():
+            self.buffer.get()
+
+        dpg.configure_item("bufferstatus", default_value=f'Buffer: {self.buffer.qsize()}/{self.buffersize}', color=(255, 255, 0))
+        dpg.configure_item("serverstatus", default_value='disconnected', color=(255, 0, 0))
+        dpg.configure_item("connectservergroup", show=True)
 
     def stream(self, socket):
         opus_decoder = None
@@ -339,6 +345,7 @@ class App:
                     if self.buffer.not_empty:
                         data = self.buffer.get()
                     else:
+                        dpg.configure_item("serverstatus", default_value='Buffering...', color=(255, 255, 0))
                         continue
 
                     bytesconunt += len(data)
@@ -589,7 +596,7 @@ class App:
         ctypes.CDLL("opus.dll")
 
         dpg.create_context()
-        dpg.create_viewport(title=f'IDRB Client v1.6.1 Beta', width=1280, height=720, large_icon="IDRBfavicon.ico", clear_color=(43, 45, 48))  # set viewport window
+        dpg.create_viewport(title=f'IDRB Client v1.6.2 Beta', width=1280, height=720, large_icon="IDRBfavicon.ico", clear_color=(43, 45, 48))  # set viewport window
         dpg.setup_dearpygui()
         # -------------- add code here --------------
         noimage_texture_data = []
@@ -621,6 +628,7 @@ class App:
                 output_devices.append(device_info['name'])
 
         dpg.configure_item("selectaudiooutputdevicecombo", items=output_devices, default_value=self.config["audio"]["device"])
+        dpg.configure_item("buffersizeintinput", default_value=int(self.config["network"]["buffersize"]))
 
         # -------------------------------------------
         dpg.show_viewport()
