@@ -47,8 +47,5 @@ public = True
 ServerIP = "localhost"
 #ServerPort = server_port[1]
 ServerPort = 6980
-<<<<<<< HEAD
 ThaiSDRkey = ""
-=======
-ThaiSDRkey = ""
->>>>>>> 53163be3dc12010715271f6020a0c07d2af720ec
+
