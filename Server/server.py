@@ -21,9 +21,13 @@ import pickle
 import threading
 import zmq
 import logging
-import zlib
+import lz4.frame
 import queue
 import math
+import os
+
+os.environ["damp11113_load_all_module"] = "NO"
+os.environ["damp11113_check_update"] = "NO"
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s')
 ServerLog = logging.getLogger("IDRBServer")
@@ -88,8 +92,10 @@ def Muxer():
         # ENC1encrypted, ENC1salt, ENC1iv = utils.encrypt_data(ENchannel1, "password")
 
         # ENchannel1 = ENC1encrypted + b'|||||' + ENC1salt + b'|||||' + ENC1iv
-
-        ENchannel2 = Encoder.channel2.get()
+        try:
+            ENchannel2 = Encoder.channel2.get()
+        except:
+            ENchannel2 = b""
         content = {
             "first": False,
             "mainchannel": 1,
@@ -119,7 +125,7 @@ def Muxer():
         }
         ThaiSDRDir.content = content
 
-        compressedcontent = zlib.compress(pickle.dumps(content), level=Settings.compression_level)
+        compressedcontent = lz4.frame.compress(pickle.dumps(content), compression_level=Settings.compression_level)
 
         Buffer.put(compressedcontent)
 

@@ -28,7 +28,7 @@ import zmq
 from pyogg import OpusDecoder
 import configparser
 import ctypes
-import zlib
+import lz4.frame
 
 from utils import *
 import appcomponent
@@ -40,7 +40,7 @@ class App:
         self.config = configparser.ConfigParser()
         self.config.read("config.ini")
         self.device_name_output = self.config["audio"]["device"]
-        self.buffersize = self.config["network"]["buffersize"]
+        self.buffersize = int(self.config["network"]["buffersize"])
 
         self.working = False
         self.readchannel = 1
@@ -396,7 +396,7 @@ class App:
                         break
 
                     try:
-                        decompressed_data = zlib.decompress(data)
+                        decompressed_data = lz4.frame.decompress(data)
 
                         datadecoded = pickle.loads(decompressed_data)
                     except:

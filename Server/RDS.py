@@ -19,7 +19,7 @@ import time
 from datetime import datetime
 import cv2
 import numpy as np
-from damp11113 import scrollTextBySteps
+from damp11113.utils import scrollTextBySteps
 import threading
 import Settings
 import logging
@@ -96,12 +96,6 @@ RDS = {
     "AS": [ # AS = Alternative Server
         # can add more server here
     ],
-    "ContentInfo": {
-        "Codec": "opus",
-        "bitrate": 64000,
-        "channel": 2,
-        "samplerates": 48000
-    },
     "images": {
         "logo": {
             "lazy": False,
@@ -145,12 +139,6 @@ RDS2 = {
     "AS": [ # AS = Alternative Server
         # can add more server here
     ],
-    "ContentInfo": {
-        "Codec": "Opus",
-        "bitrate": 8000,
-        "channel": 2,
-        "samplerates": 48000
-    },
     "images": {
         "logo": None
     }
@@ -194,5 +182,5 @@ def startRDSThread():
 
     thread.start()
     thread2.start()
-    thread3.start()
+    #thread3.start()
 

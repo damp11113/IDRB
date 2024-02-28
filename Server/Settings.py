@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with IDRB Project.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import lz4.frame
+
 # To config Muxer you need to goto server.py and find "Config Muxer"
 # To config RDS you need to goto RDS.py
 # To config Encoder you need to goto Encoder.py
@@ -23,7 +25,7 @@ along with IDRB Project.  If not, see <https://www.gnu.org/licenses/>.
 # Server Settings
 protocol = "ZMQ_WS" # TCP ZMQ ZMQ_WS
 server_port = ('*', 6980) # if use other protocol ZMQ please use 0.0.0.0
-compression_level = 9 # 0-9
+compression_level = lz4.frame.COMPRESSIONLEVEL_MAX
 buffersize = 32 # must be int (on working it use buffersize + (buffersize/2) to standby)
 # low buffersize = low delay
 
@@ -42,13 +44,9 @@ If you want your server to be listed publicly on ThaiSDR Directory, following th
 6. copy api key
 
 """
-public = True
+public = False
 #ServerIP = "IDRB.damp11113.xyz" # do not add protocol before ip
 ServerIP = "localhost"
 #ServerPort = server_port[1]
 ServerPort = 6980
-<<<<<<< HEAD
-ThaiSDRkey = ""
-=======
-ThaiSDRkey = ""
->>>>>>> 53163be3dc12010715271f6020a0c07d2af720ec
+ThaiSDRkey = "1N5LURICLIN1U9QNYZ4MHJ6FNXISFXFELZAX135CFM0HSD17O2.63E60BE9EEA2339C113A15EB"

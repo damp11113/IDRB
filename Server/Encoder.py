@@ -14,14 +14,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with IDRB Project.  If not, see <https://www.gnu.org/licenses/>.
 """
-
 import threading
 from queue import Queue
-from pyogg import OpusBufferedEncoder
-import numpy as np
 import pyaudio
 import RDS as _RDS
 import logging
+import tools
 
 EncoderLog = logging.getLogger("Encoder")
 
@@ -37,64 +35,28 @@ for i in range(p.get_device_count()):
         device_index_input = dev['index']
         break
 
-device_name_input = "Line 4 (Virtual Audio Cable)"
-device_index_input2 = 0
-for i in range(p.get_device_count()):
-    dev = p.get_device_info_by_index(i)
-    if dev['name'] == device_name_input:
-        device_index_input2 = dev['index']
-        break
-
-streaminput = p.open(format=pyaudio.paInt16, channels=2, rate=48000, input=True, input_device_index=device_index_input)
-streaminput2 = p.open(format=pyaudio.paInt16, channels=2, rate=48000, input=True, input_device_index=device_index_input2)
-
 # Create a shared queue for encoded audio packets
 channel1 = Queue()
 
 channel2 = Queue()
 
-# Function to continuously encode audio and put it into the queue
-def encode_audio():
-    encoder = OpusBufferedEncoder()
-    encoder.set_application("audio")
-    encoder.set_sampling_frequency(_RDS.RDS["ContentInfo"]["samplerates"])
-    encoder.set_channels(_RDS.RDS["ContentInfo"]["channel"])
-    encoder.set_bitrates(_RDS.RDS["ContentInfo"]["bitrate"])
-    encoder.set_frame_size(60)
-    encoder.set_bitrate_mode("VBR")
-    encoder.set_compresion_complex(10)
+channel1option = {
+    "Bitrates": 64000,
+    "DeviceInputIndex": device_index_input
+}
 
-    while True:
-        pcm = np.frombuffer(streaminput.read(1024, exception_on_overflow=False), dtype=np.int16)
+channel2option = {
+    "Bitrates": 18000,
+    "InputWAVFile": "./Samples/audiotest.wav"
+}
 
-        encoded_packets = encoder.buffered_encode(memoryview(bytearray(pcm)))
-        for encoded_packet, _, _ in encoded_packets:
-            # Put the encoded audio into the buffer
 
-            channel1.put(encoded_packet.tobytes())
+EncoderChannel1 = tools.AudioEncoder(_RDS.RDS, channel1option, channel1)
 
-def encode_audio2():
-    encoder2 = OpusBufferedEncoder()
-    encoder2.set_application("audio")
-    encoder2.set_sampling_frequency(_RDS.RDS2["ContentInfo"]["samplerates"])
-    encoder2.set_channels(_RDS.RDS2["ContentInfo"]["channel"])
-    encoder2.set_bitrates(_RDS.RDS2["ContentInfo"]["bitrate"])
-    encoder2.set_frame_size(60)
-
-    while True:
-        pcm2 = np.frombuffer(streaminput2.read(1024, exception_on_overflow=False), dtype=np.int16)
-
-        encoded_packets = encoder2.buffered_encode(memoryview(bytearray(pcm2)))
-        for encoded_packet, _, _ in encoded_packets:
-            # Put the encoded audio into the buffer
-            channel2.put(encoded_packet.tobytes())
-
-        #channel2.put(pcm2.tobytes()) # if you use pcm
+EncoderChannel2 = tools.AudioEncoder(_RDS.RDS2, channel2option, channel2, "wav")
 
 def StartEncoder():
     EncoderLog.info("Starting encoder")
-    audio_thread = threading.Thread(target=encode_audio)
-    audio_thread2 = threading.Thread(target=encode_audio2)
 
-    audio_thread.start()
-    audio_thread2.start()
+    EncoderChannel1.startencoder()
+    EncoderChannel2.startencoder()
