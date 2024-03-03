@@ -36,9 +36,9 @@ for i in range(p.get_device_count()):
         break
 
 # Create a shared queue for encoded audio packets
-channel1 = Queue()
+channel1 = Queue(maxsize=128)
 
-channel2 = Queue()
+channel2 = Queue(maxsize=128)
 
 channel1option = {
     "Bitrates": 64000,

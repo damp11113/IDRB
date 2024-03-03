@@ -19,7 +19,7 @@ import dearpygui.dearpygui as dpg
 
 from utils import *
 
-librarylist = ["Opencv (opencv.org)", "PyOgg (TeamPyOgg) (Forked)", "DearPyGui (hoffstadt)"]
+librarylist = ["Opencv (opencv.org)", "PyOgg (TeamPyOgg) (Forked)", "DearPyGui (hoffstadt)", "LZ4 (python-lz4)", "PyAudio (CristiFati)"]
 
 def window(self):
     with dpg.window(label="IDRB", width=320, height=520, no_close=True):
